@@ -1,6 +1,12 @@
-import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
+// src/pages/Login.jsx
+// নতুন ডিজাইন, লজিক আগের মতোই: login(email, password) → role অনুযায়ী ড্যাশবোর্ডে।
+// দরকার: components/AuthLayout.jsx, components/LiveStats.jsx (Icon)
+
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import AuthLayout, { Field } from "../components/AuthLayout";
+import { Icon } from "../components/LiveStats";
 
 function Login() {
   const { login } = useAuth();
@@ -8,6 +14,7 @@ function Login() {
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -25,67 +32,80 @@ function Login() {
       return;
     }
 
-    // matches App.jsx's actual route paths: /donor/dashboard, /ngo/dashboard, /admin/dashboard
+    // App.jsx-এর রুট অনুযায়ী: /donor/dashboard, /ngo/dashboard, /admin/dashboard
     navigate(`/${result.user.role}/dashboard`);
   }
 
   return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center px-6">
-
-      <div className="bg-white w-full max-w-md p-8 rounded-xl shadow-md">
-
-        <h1 className="text-3xl font-bold text-green-700 text-center">
-          Welcome Back
-        </h1>
-
-        <p className="text-gray-600 text-center mt-2">
-          Login to your FoodShare account
-        </p>
-
-        {error && (
-          <p className="mt-4 text-red-600 text-center text-sm">{error}</p>
-        )}
-
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={form.email}
-            onChange={handleChange}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3"
-          />
-
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={handleChange}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3"
-          />
-
-          <button
-            type="submit"
-            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700"
-          >
-            Login
-          </button>
-
-        </form>
-
-        <p className="text-center text-gray-600 mt-6">
+    <AuthLayout
+      heading="Welcome back"
+      subheading="Log in to your FoodShare account."
+      footer={
+        <>
           Don't have an account?{" "}
-          <Link to="/register" className="text-green-600 font-semibold hover:text-green-700">
+          <Link
+            to="/register"
+            className="font-semibold text-[#0F2E22] underline underline-offset-4 decoration-2 decoration-[#F2B01E] hover:decoration-[#0F2E22]"
+          >
             Register
           </Link>
-        </p>
+        </>
+      }
+    >
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 flex items-start gap-2.5 rounded-xl border border-[#E5322D]/30 bg-[#FFF0EE] px-4 py-3 text-sm text-[#B3231F]"
+        >
+          <Icon name="ban" className="w-4 h-4 mt-0.5 shrink-0" />
+          {error}
+        </div>
+      )}
 
-      </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Field
+          label="Email address"
+          id="email"
+          icon="mail"
+          type="email"
+          name="email"
+          value={form.email}
+          onChange={handleChange}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
 
-    </div>
-  )
+        <Field
+          label="Password"
+          id="password"
+          icon="lock"
+          type={showPassword ? "text" : "password"}
+          name="password"
+          value={form.password}
+          onChange={handleChange}
+          placeholder="Your password"
+          autoComplete="current-password"
+          right={
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="p-2 rounded-lg text-[#3B4F43] hover:bg-[#F2B01E]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F2B01E]"
+            >
+              <Icon name={showPassword ? "eyeoff" : "eye"} className="w-[18px] h-[18px]" />
+            </button>
+          }
+        />
+
+        <button
+          type="submit"
+          className="w-full rounded-full bg-[#0F2E22] py-3.5 font-semibold text-white shadow-lg shadow-[#0F2E22]/20 hover:bg-[#184230] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F2E22]"
+        >
+          Log in
+        </button>
+      </form>
+    </AuthLayout>
+  );
 }
 
-export default Login
+export default Login;
