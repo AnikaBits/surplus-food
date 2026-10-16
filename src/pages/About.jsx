@@ -1,349 +1,374 @@
 // src/pages/About.jsx
+// মিশ্র ভার্সন: পুরনো হিরো হেডলাইন, ছবির কোলাজ ও Events রাখা হয়েছে,
+// বাকিটা নতুন (সমস্যা ও সমাধান, What we do, Live Impact, NGO পার্টনার, টিম, FAQ)।
+// থিম: Home-এর মতো হলুদ + গাঢ় সবুজ।
+//
+// দরকার: components/LiveStats.jsx, utils/time.js, components/Navbar, components/Footer,
+//        assets/img3.jpeg, assets/img4.jpeg
+
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import LiveStats, { Icon } from "../components/LiveStats";
+import { useAuth } from "../context/AuthContext";
+import { msRemaining } from "../utils/time";
 import img3 from "../assets/img3.jpeg";
 import img4 from "../assets/img4.jpeg";
-import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
 
-// ===== কাউন্টার =====
-function Counter({ end, suffix = "" }) {
-  const [count, setCount] = useState(0);
+// ========== এখানে নিজের তথ্য বসাও ==========
 
-  useEffect(() => {
-    let current = 0;
-    const increment = Math.ceil(end / 60);
+// Events: সত্যিকারের ইভেন্ট অনুযায়ী নাম, তারিখ ও ছবি বদলাও (কার্ড যোগ/কমানো যাবে)
+const EVENTS = [
+  { img: img3, title: "Food Campaign at Shristi Orphanage", date: "" },
+  { img: img4, title: "Food Campaign at Shristi Orphanage", date: "" },
+];
 
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(current);
-      }
-    }, 30);
+// টিম: নাম, ভূমিকা, ছবি (ছবি ফাঁকা ("") থাকলে হালকা রঙের বক্স দেখাবে)
+const TEAM = [
+  { name: "", role: "", img: "" },
+  { name: "", role: "", img: "" },
+  { name: "", role: "", img: "" },
+  { name: "", role: "", img: "" },
+];
 
-    return () => clearInterval(timer);
-  }, [end]);
+// =========================================
 
+const FONT = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
+
+// হলুদ হাইলাইট (পুরনো হিরোর মতো)
+function Highlight({ children }) {
   return (
-    <>
-      {count.toLocaleString()}
-      {suffix}
-    </>
+    <span className="relative inline-block">
+      <span className="relative z-10">{children}</span>
+      <span className="absolute -inset-x-2 -inset-y-1 bg-[#F2B01E]/70 -rotate-1 rounded-full z-0" aria-hidden="true" />
+    </span>
   );
 }
 
-// ===== ডট প্যাটার্ন ডেকোরেশন =====
-function DotPattern({ className = "", cols = 6, rows = 6 }) {
-  return (
-    <div
-      className={`grid gap-1.5 ${className}`}
-      style={{ gridTemplateColumns: `repeat(${cols}, 6px)` }}
-    >
-      {Array.from({ length: cols * rows }).map((_, i) => (
-        <span key={i} className="w-1.5 h-1.5 rounded-full bg-green-600/60"></span>
-      ))}
-    </div>
-  );
+function Photo({ src, alt = "", className = "" }) {
+  if (src) return <img src={src} alt={alt} className={`object-cover ${className}`} />;
+  return <div className={`bg-[#ECE4C8] ${className}`} aria-hidden="true" />;
 }
+
+const WHAT_WE_DO = [
+  {
+    icon: "bowl",
+    title: "Post surplus food",
+    text: "Donors list what they have, how much, where to collect it and when it expires.",
+  },
+  {
+    icon: "bolt",
+    title: "Show the urgent first",
+    text: "Food with the least time left rises to the top, so NGOs collect it before it spoils.",
+  },
+  {
+    icon: "truck",
+    title: "Track every pickup",
+    text: "Each donation moves from approved to picked up, on the way and delivered.",
+  },
+  {
+    icon: "shield",
+    title: "Keep it trustworthy",
+    text: "An admin reviews every donor and NGO before they can post or collect food.",
+  },
+];
+
+const FAQ = [
+  {
+    q: "Who can donate food?",
+    a: "Restaurants, hotels, cafeterias, event organisers and households. Register as a donor, and once an admin approves your account you can post food.",
+  },
+  {
+    q: "How do NGOs get approved?",
+    a: "Every NGO registration is reviewed by an admin. Until it is approved, the account cannot request food.",
+  },
+  {
+    q: "How do you keep the food safe?",
+    a: "Donors add preparation and expiry times, and NGOs can see how much time is left before they request. We ask donors to share only food that is still safe to eat.",
+  },
+  {
+    q: "What happens after an NGO requests food?",
+    a: "The donor approves the request. The NGO then marks the food as picked up, on the way and delivered, and records where it was distributed.",
+  },
+];
 
 function About() {
-  return (
-    <div className="min-h-screen bg-white text-gray-800 overflow-hidden">
+  const { donations = [], users = [] } = useAuth();
 
-      {/* ================= NAVBAR ================= */}
+  // Home-এর মতো একই আসল সংখ্যা
+  const qty = (d) => parseInt(d.totalQuantity, 10) || 0;
+  const now = Date.now();
+  const mealsDelivered = donations.filter((d) => d.status === "delivered").reduce((s, d) => s + qty(d), 0);
+  const mealsWaiting = donations
+    .filter((d) => d.status === "available" && (msRemaining(d, now) ?? 1) > 0)
+    .reduce((s, d) => s + qty(d), 0);
+  const approvedNgos = users.filter((u) => u.role === "ngo" && u.status === "approved");
+  const peopleReached = donations.reduce((s, d) => s + (d.distribution?.estimatedPeopleHelped || 0), 0);
+  const totalMeals = donations.reduce((s, d) => s + qty(d), 0);
+  const deliveredPercent = totalMeals ? Math.round((mealsDelivered / totalMeals) * 100) : 0;
+
+  const stats = [
+    { icon: "bowl", value: mealsDelivered, label: "Meals delivered" },
+    { icon: "truck", value: mealsWaiting, label: "Awaiting pickup" },
+    { icon: "handshake", value: approvedNgos.length, label: "NGO partners" },
+    { icon: "users", value: peopleReached, label: "People reached" },
+  ];
+
+  const focus =
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F2E22]";
+
+  return (
+    <div className="min-h-screen bg-[#F6F7F2] text-[#14231B] overflow-x-hidden" style={FONT}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap');`}</style>
+
       <Navbar />
 
-      {/* ================= HERO ================= */}
-      <section className="relative px-6 pt-16 pb-20">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+      {/* ============ HERO (পুরনো হেডলাইন রাখা) ============ */}
+      <section className="max-w-6xl mx-auto px-6 pt-12 pb-16 grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.15] text-[#0F2E22]">
+            Empowering <Highlight>Communities,</Highlight>
+            <br />
+            Nourishing Futures
+          </h1>
 
-          {/* Left Text */}
-          <div className="relative z-10">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.15] text-[#1e3d2a]">
-              Empowering{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">Communities,</span>
-                <span className="absolute -inset-x-2 -inset-y-1 bg-yellow-300/70 -rotate-1 rounded-full z-0"></span>
-              </span>
-              <br />
-              Nourishing Futures
-            </h1>
+          <p className="mt-6 text-lg leading-relaxed text-[#3B4F43] max-w-lg">
+            FoodShare connects people who have food to spare with the NGOs and
+            volunteers who can get it to those who need it, before it spoils.
+          </p>
 
-            <p className="mt-6 text-gray-600 text-lg leading-relaxed max-w-lg">
-              Join us in the fight against hunger for a brighter tomorrow
-            </p>
-
+          <div className="mt-8 flex flex-wrap gap-3">
             <Link
               to="/register"
-              className="inline-block mt-8 px-7 py-3 bg-yellow-300 text-[#1e3d2a] font-semibold rounded-md hover:bg-yellow-400 transition shadow-sm"
+              className={`inline-flex items-center px-7 py-3 rounded-full bg-[#0F2E22] text-white font-semibold hover:bg-[#184230] transition shadow-lg shadow-[#0F2E22]/20 ${focus}`}
             >
-              Join Us
+              Join us
+            </Link>
+            <Link
+              to="/available-food"
+              className={`inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#F2B01E] text-[#0F2E22] font-semibold hover:bg-[#FFC53D] transition ${focus}`}
+            >
+              <Icon name="search" className="w-4 h-4" />
+              Find food
             </Link>
           </div>
+        </div>
 
-          {/* Right Image */}
-          <div className="relative">
-            <DotPattern className="absolute -top-6 -right-4 z-0" cols={7} rows={6} />
+        <div className="relative">
+          <div className="absolute -bottom-3 -right-3 w-full h-full rounded-3xl bg-[#F2B01E]" aria-hidden="true" />
+          <img
+            src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=900"
+            alt="Children sharing food"
+            className="relative w-full h-[320px] object-cover rounded-3xl shadow-xl"
+          />
+        </div>
+      </section>
+
+      {/* ============ সমস্যা ও সমাধান + কোলাজ (পুরনো কোলাজ রাখা) ============ */}
+      <section className="bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-16 grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold leading-tight text-[#0F2E22]">
+              The problem is <Highlight>timing,</Highlight>
+              <br />
+              not shortage
+            </h2>
+            <p className="mt-6 text-[#3B4F43] leading-7 max-w-lg">
+              Cooked food spoils within hours. By the time a donor finds an NGO
+              by phone, the food may already be too old to share. Most of the
+              loss happens in that gap.
+            </p>
+            <p className="mt-3 text-[#3B4F43] leading-7 max-w-lg">
+              FoodShare closes it. Donors post food with an expiry time, NGOs see
+              the most urgent listings first, and each pickup is tracked until
+              it is delivered.
+            </p>
+          </div>
+
+          {/* কোলাজ */}
+          <div className="relative h-[400px] max-w-md mx-auto lg:max-w-none w-full">
             <img
-              src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=900"
-              alt="Children sharing food"
-              className="relative z-10 w-full h-[380px] object-cover rounded-2xl shadow-xl"
+              src="https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?w=600"
+              alt="Kids eating"
+              className="absolute top-0 right-0 w-[55%] h-[55%] object-cover rounded-2xl shadow-lg z-10"
             />
-            <DotPattern className="absolute -bottom-6 -left-4 z-0" cols={5} rows={5} />
+            <img
+              src="https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=600"
+              alt="Volunteer"
+              className="absolute top-[38%] left-0 w-[55%] h-[55%] object-cover rounded-2xl shadow-lg z-20"
+            />
+            <img
+              src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600"
+              alt="Community meal"
+              className="absolute bottom-0 right-[8%] w-[48%] h-[45%] object-cover rounded-2xl shadow-lg z-30"
+            />
+            <span className="absolute -top-3 left-6 w-20 h-20 rounded-full bg-[#F2B01E]" aria-hidden="true" />
           </div>
         </div>
       </section>
 
-      {/* ================= DONATION CARD ================= */}
-      <section className="px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="relative bg-[#1e3d2a] rounded-xl shadow-lg">
-            <DotPattern
-              className="absolute -top-3 -left-3 bg-white p-2 rounded-full"
-              cols={4}
-              rows={4}
-            />
+      {/* ============ WHAT WE DO (পুরনো Services-এর বদলে) ============ */}
+      <section className="max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-3xl md:text-4xl font-bold text-[#0F2E22]">
+          What <Highlight>we do</Highlight>
+        </h2>
+        <p className="mt-4 text-[#3B4F43] max-w-xl">
+          Four things, done simply, so surplus food reaches people while it is still good.
+        </p>
 
-            <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/10 p-6 gap-4 items-center">
-              <div className="md:pl-6">
-                <h3 className="text-white font-semibold text-lg">
-                  Donate. Help people who are in need.
-                </h3>
-              </div>
+        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {WHAT_WE_DO.map((w, i) => (
+            <div key={w.title} className="bg-white rounded-2xl p-5 shadow-sm">
+              <span className="w-12 h-12 rounded-full bg-[#0F2E22] text-[#F2B01E] flex items-center justify-center">
+                <Icon name={w.icon} className="w-5 h-5" />
+              </span>
+              <p className="mt-4 text-xs font-semibold text-[#9A6B00] tabular-nums">0{i + 1}</p>
+              <h3 className="mt-1 text-lg font-semibold">{w.title}</h3>
+              <p className="mt-1.5 text-sm text-[#3B4F43] leading-6">{w.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-              <div className="md:px-6 py-4 md:py-0">
-                <p className="text-xs uppercase tracking-widest text-green-300">
-                  Donation amount
-                </p>
-                <p className="mt-1 text-2xl font-bold text-white">
-                  ৳5,100
-                </p>
-              </div>
+      {/* ============ LIVE IMPACT ============ */}
+      <LiveStats stats={stats} progress={{ percent: deliveredPercent, label: "Delivered so far" }} />
 
-              <div className="md:pl-6 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-green-300">
-                    Paid up
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-white">
-                    Quarterly
-                  </p>
+      {/* ============ NGO পার্টনার (আসল ডেটা, না থাকলে লুকানো) ============ */}
+      {approvedNgos.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 py-14">
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0F2E22]">
+            Our <Highlight>NGO partners</Highlight>
+          </h2>
+
+          <ul className="mt-8 flex flex-wrap gap-3">
+            {approvedNgos.map((ngo) => (
+              <li
+                key={ngo.id}
+                className="flex items-center gap-3 bg-white rounded-full pl-2 pr-5 py-2 shadow-sm border border-[#0F2E22]/10"
+              >
+                {ngo.image ? (
+                  <img src={ngo.image} alt="" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <span className="w-9 h-9 rounded-full bg-[#ECE4C8]" aria-hidden="true" />
+                )}
+                <span className="font-medium text-sm">{ngo.name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ============ EVENTS (পুরনো ডিজাইন রাখা) ============ */}
+      {EVENTS.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 py-14">
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0F2E22]">
+            Our <Highlight>events</Highlight>
+          </h2>
+          <p className="mt-4 text-[#3B4F43]">Moments from the field.</p>
+
+          <div className="mt-8 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {EVENTS.map((e, i) => (
+              <div key={i} className="relative rounded-2xl overflow-hidden group h-[280px] shadow-md">
+                <img
+                  src={e.img}
+                  alt={e.title}
+                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 motion-safe:transition motion-safe:duration-500"
+                />
+                <div className="absolute inset-0 bg-[#0F2E22]/55 flex flex-col items-center justify-center text-center p-6">
+                  <h3 className="text-white font-bold text-lg leading-snug">{e.title}</h3>
+                  {e.date && <p className="mt-1 text-sm text-[#F2B01E]">{e.date}</p>}
                 </div>
-                <Link
-                  to="/register"
-                  className="px-5 py-2.5 bg-yellow-300 text-[#1e3d2a] font-semibold rounded-md hover:bg-yellow-400 transition text-sm whitespace-nowrap"
-                >
-                  Donate now
-                </Link>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ============ TEAM ============ */}
+      <section className="bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0F2E22]">
+            The <Highlight>team</Highlight> behind it
+          </h2>
+
+          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {TEAM.map((m, i) => (
+              <div key={i} className="bg-[#F6F7F2] rounded-2xl p-3">
+                <Photo src={m.img} alt={m.name} className="w-full h-48 rounded-xl" />
+                <div className="px-1 pt-3 pb-1">
+                  <p className="font-semibold">{m.name || "Name"}</p>
+                  <p className="text-sm text-[#3B4F43]">{m.role || "Role"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ FAQ ============ */}
+      <section className="max-w-3xl mx-auto px-6 py-16">
+        <h2 className="text-3xl md:text-4xl font-bold text-[#0F2E22]">
+          Questions <Highlight>people ask</Highlight>
+        </h2>
+
+        <div className="mt-8 space-y-3">
+          {FAQ.map((f) => (
+            <details
+              key={f.q}
+              className="group rounded-2xl border border-[#0F2E22]/15 bg-white open:bg-[#FFF6DB] open:border-[#F2B01E] p-5"
+            >
+              <summary className="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-[#0F2E22] [&::-webkit-details-marker]:hidden">
+                {f.q}
+                <span className="shrink-0 w-7 h-7 rounded-full bg-[#0F2E22] text-[#F2B01E] flex items-center justify-center motion-safe:transition-transform group-open:rotate-90">
+                  <Icon name="arrow" className="w-3.5 h-3.5" />
+                </span>
+              </summary>
+              <p className="mt-3 text-sm text-[#3B4F43] leading-6">{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* ============ CTA ============ */}
+      <section className="max-w-6xl mx-auto px-6 pb-12">
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#0F2E22] px-6 md:px-10 py-10">
+          <img
+            src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-[#0F2E22]/85" aria-hidden="true" />
+
+          <div className="relative grid md:grid-cols-[1.3fr_1fr] gap-6 items-center">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.16em] uppercase text-[#F2B01E]">Join us</p>
+              <h2 className="mt-2 text-3xl md:text-4xl font-bold text-white">Got food, or time to give?</h2>
+              <p className="mt-3 text-sm md:text-base text-[#DCE9E0] leading-7 max-w-lg">
+                Post surplus food, collect it for people in need, or help deliver
+                it. Everyone has a part to play.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3 md:justify-end">
+              <Link
+                to="/register"
+                className="inline-flex items-center px-7 py-3 rounded-full bg-[#F2B01E] text-[#0F2E22] font-semibold hover:bg-[#FFC53D] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Donate food
+              </Link>
+              <Link
+                to="/contact"
+                className="inline-flex items-center px-7 py-3 rounded-full border-2 border-white/80 text-white font-semibold hover:bg-white/10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Contact us
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ================= ACHIEVEMENTS ================= */}
-      <section className="relative px-6 py-24">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
-
-          {/* Left Text */}
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-[#1e3d2a]">
-              See what we have{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">achieved</span>
-                <span className="absolute -inset-x-2 -inset-y-1 bg-yellow-300/70 -rotate-1 rounded-full z-0"></span>
-              </span>
-              <br />
-              with your help
-            </h2>
-
-            <p className="mt-6 text-gray-600 leading-8 max-w-lg">
-              Since our inception, we have touched the lives of{" "}
-              <span className="font-semibold text-[#1e3d2a]">
-                <Counter end={1000} />+
-              </span>{" "}
-              children and families. Through the generosity of our donors and
-              the dedication of our volunteers, we have been able to serve{" "}
-              <span className="font-semibold text-[#1e3d2a]">
-                <Counter end={45} />K
-              </span>{" "}
-              meals and establish{" "}
-              <span className="font-semibold text-[#1e3d2a]">
-                <Counter end={12} />+
-              </span>{" "}
-              community kitchens. These accomplishments fuel our determination
-              to do even more.
-            </p>
-
-            <Link
-              to="/register"
-              className="inline-block mt-8 px-6 py-3 bg-[#1e3d2a] text-white font-semibold rounded-md hover:bg-[#2a5238] transition"
-            >
-              Join Us
-            </Link>
-          </div>
-
-          {/* Right Image Collage */}
-          <div className="relative h-[520px]">
-            <DotPattern className="absolute top-0 right-0 z-0" cols={6} rows={5} />
-
-            <img
-              src="https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?w=600"
-              alt="Kids eating"
-              className="absolute top-0 right-0 w-[55%] h-[55%] object-cover rounded-xl shadow-lg z-10"
-            />
-            <img
-              src="https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=600"
-              alt="Volunteer"
-              className="absolute top-[38%] left-0 w-[55%] h-[55%] object-cover rounded-xl shadow-lg z-20"
-            />
-            <img
-              src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600"
-              alt="Community meal"
-              className="absolute bottom-0 right-[8%] w-[48%] h-[45%] object-cover rounded-xl shadow-lg z-30"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ================= SERVICES ================= */}
-      <section className="relative px-6 py-20 bg-[#f7faf7]">
-        <DotPattern className="absolute top-10 right-10 opacity-60" cols={5} rows={6} />
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="mb-14">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1e3d2a]">
-              Our{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">services</span>
-                <span className="absolute -inset-x-2 -inset-y-1 bg-yellow-300/70 -rotate-1 rounded-full z-0"></span>
-              </span>
-            </h2>
-            <p className="mt-3 text-gray-600">
-              become a volunteer and contribute
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {[
-              {
-                title: "Meal Programs",
-                desc: "The primary service is the provision of regular, nutritious meals to children who are underprivileged or at risk of malnutrition.",
-              },
-              {
-                title: "Community Kitchens",
-                desc: "Some NGOs establish community kitchens where volunteers prepare meals for children in need. This not-for-profit organization provides meals to children in need.",
-              },
-              {
-                title: "School Feeding Programs",
-                desc: "Collaborating with schools to provide meals to students is a common approach. This helps ensure that children receive proper nutrition.",
-              },
-              {
-                title: "Health And Wellness",
-                desc: "Beyond just providing food, the NGO may engage in health and wellness initiatives, such as organizing health camps.",
-              },
-              {
-                title: "Emergency Food Relief",
-                desc: "In times of crisis, such as natural disasters or conflicts, the NGO may organize emergency food relief efforts.",
-              },
-              {
-                title: "Nutritional Support",
-                desc: "The NGO may offer nutritional support and education to ensure that the meals provided are balanced and meet the needs of the communities.",
-              },
-            ].map((s, i) => (
-              <div key={i} className="group">
-                {/* Simple line-based icon substitute */}
-                <div className="w-12 h-12 rounded-full border-2 border-[#1e3d2a] flex items-center justify-center text-[#1e3d2a] font-bold text-sm">
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-
-                <h3 className="mt-5 text-lg font-bold text-[#1e3d2a]">
-                  {s.title}
-                </h3>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                  {s.desc}
-                </p>
-                <button className="mt-4 text-sm font-semibold text-[#1e3d2a] border-b border-[#1e3d2a]/40 hover:border-[#1e3d2a] transition pb-0.5">
-                  Learn more →
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= EVENTS ================= */}
-      <section className="relative px-6 py-20">
-        <DotPattern className="absolute top-10 right-10 opacity-60" cols={5} rows={6} />
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="mb-12">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1e3d2a]">
-              Our{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">Events</span>
-                <span className="absolute -inset-x-2 -inset-y-1 bg-yellow-300/70 -rotate-1 rounded-full z-0"></span>
-              </span>
-            </h2>
-            <p className="mt-3 text-gray-600">
-              that bought smiles on faces
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                img: img3,
-                title: "Food Campaign at Shristi Orphanage",
-                active: false,
-              },
-              {
-                img: img4,
-                title: "Food Campaign at Shristi Orphanage",
-                active: true,
-              },
-              {
-                img: img3,
-                title: "Food Campaign at Shristi Orphanage",
-                active: false,
-              },
-              
-             
-            ].map((e, i) => (
-              <div
-                key={i}
-                className="relative rounded-xl overflow-hidden group h-[300px] shadow-md"
-              >
-                <img
-                  src={e.img}
-                  alt={e.title}
-                  className={`w-full h-full object-cover transition duration-500 ${
-                    e.active
-                      ? "grayscale-0"
-                      : "grayscale group-hover:grayscale-0"
-                  }`}
-                />
-
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-center p-6">
-                  <h3 className="text-white font-bold text-lg leading-snug">
-                    {e.title}
-                  </h3>
-                  <button className="mt-4 px-4 py-2 bg-yellow-300 text-[#1e3d2a] text-sm font-semibold rounded-md hover:bg-yellow-400 transition">
-                    View event
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= FOOTER ================= */}
       <Footer />
-
     </div>
   );
 }

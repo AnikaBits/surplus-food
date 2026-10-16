@@ -1,5 +1,25 @@
 import { useAuth } from "../../../context/AuthContext";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Icon } from "../../../components/LiveStats";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
+const COLORS = ["#F2B01E", "#0F2E22", "#8FD19E", "#FF7A59", "#7CC4F2", "#B9A66A"];
+
+const TOOLTIP_STYLE = {
+  borderRadius: 12,
+  border: "1px solid rgba(15,46,34,0.15)",
+  fontSize: 13,
+};
 
 function AnalyticsDashboard() {
   const { users, donations, moneyDonations } = useAuth();
@@ -12,72 +32,80 @@ function AnalyticsDashboard() {
 
   const statusCounts = ["available", "requested", "approved", "picked_up", "on_the_way", "delivered"].map(
     (status) => ({
-      status,
+      status: status.replace("_", " "),
       count: donations.filter((d) => d.status === status).length,
     })
   );
 
   const categoryCounts = Object.entries(
     donations.reduce((acc, d) => {
-      acc[d.category] = (acc[d.category] || 0) + 1;
+      const key = d.category || "Other";
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {})
   ).map(([name, value]) => ({ name, value }));
 
-  const COLORS = ["#16a34a", "#f59e0b", "#3b82f6", "#a855f7", "#6366f1", "#6b7280"];
+  const cards = [
+    { icon: "list", value: totalDonations, label: "Total donations", bg: "bg-[#F2B01E]", ring: "text-[#0F2E22]" },
+    { icon: "bowl", value: totalMeals, label: "Total meals", bg: "bg-[#FFF1CC]", ring: "text-[#8A5A00]" },
+    { icon: "users", value: activeDonors, label: "Active donors", bg: "bg-[#DDF2E2]", ring: "text-[#2F7A55]" },
+    { icon: "handshake", value: activeVolunteers, label: "Active NGOs", bg: "bg-[#FFE0D8]", ring: "text-[#D2542F]" },
+    { icon: "wallet", value: `৳${totalMoneyDonated.toLocaleString()}`, label: "Money donated", bg: "bg-[#0F2E22]", ring: "text-[#F2B01E]", dark: true },
+  ];
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Analytics Dashboard</h2>
-
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{totalDonations}</p>
-          <p className="text-xs text-gray-500">Total Donations</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{totalMeals}</p>
-          <p className="text-xs text-gray-500">Total Meals</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{activeDonors}</p>
-          <p className="text-xs text-gray-500">Active Donors</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{activeVolunteers}</p>
-          <p className="text-xs text-gray-500">Active Volunteers</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">৳{totalMoneyDonated}</p>
-          <p className="text-xs text-gray-500">Money Donated</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        {cards.map((c) => (
+          <div key={c.label} className={`${c.bg} rounded-2xl p-4`}>
+            <span className={`w-10 h-10 rounded-full bg-white/70 flex items-center justify-center ${c.ring}`}>
+              <Icon name={c.icon} className="w-5 h-5" />
+            </span>
+            <p className={`mt-3 text-3xl font-bold tabular-nums leading-none ${c.dark ? "text-white" : "text-[#0F2E22]"}`}>
+              {c.value}
+            </p>
+            <p className={`mt-1.5 text-sm ${c.dark ? "text-[#A9BFB0]" : "text-[#3B4F43]"}`}>{c.label}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="font-semibold text-gray-700 mb-3">Donations by Status</h3>
-          <ResponsiveContainer width="100%" height={250}>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-[#0F2E22]/10 shadow-sm p-5">
+          <h2 className="font-semibold text-[#0F2E22] mb-4">Donations by status</h2>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={statusCounts}>
-              <XAxis dataKey="status" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]} />
+              <XAxis dataKey="status" tick={{ fontSize: 11, fill: "#3B4F43" }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#3B4F43" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "rgba(242,176,30,0.12)" }} />
+              <Bar dataKey="count" fill="#F2B01E" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="font-semibold text-gray-700 mb-3">Donations by Category</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={categoryCounts} dataKey="value" nameKey="name" outerRadius={80} label>
-                {categoryCounts.map((entry, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="bg-white rounded-2xl border border-[#0F2E22]/10 shadow-sm p-5">
+          <h2 className="font-semibold text-[#0F2E22] mb-4">Donations by category</h2>
+          {categoryCounts.length === 0 ? (
+            <p className="text-sm text-[#3B4F43] py-16 text-center">No donations to chart yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={categoryCounts}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={90}
+                  paddingAngle={3}
+                >
+                  {categoryCounts.map((entry, index) => (
+                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

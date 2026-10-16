@@ -1,631 +1,345 @@
-import { useEffect, useState } from "react"
-import { Link } from "react-router-dom"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+// src/pages/Home.jsx
+// হলুদ + গাঢ় সবুজ থিম (আগের হলুদ রঙে ফেরা), পাতা ও হার্ট ছাড়া।
+// দরকার: utils/time.js, utils/priority.js, components/LiveStats.jsx,
+//        assets/img1.jpg, assets/img2.jpg
 
-import foodImage from "../assets/img1.jpg"
-import impactImage from "../assets/img2.jpg"
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import LiveStats, { Icon } from "../components/LiveStats";
+import { useAuth } from "../context/AuthContext";
+import { msRemaining, urgencyLevel, formatRemaining } from "../utils/time";
+import { priorityScore } from "../utils/priority";
 
-function Counter({ end }) {
-  const [count, setCount] = useState(0)
+import heroImage from "../assets/img1.jpg";
+import stepsImage from "../assets/img2.jpg";
 
+const FONT = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
+const SCRIPT = { fontFamily: "'Caveat', cursive" };
+
+// অর্গানিক ব্লব আকৃতির ছবি
+const BLOB_A = { borderRadius: "58% 42% 55% 45% / 48% 55% 45% 52%" };
+const BLOB_B = { borderRadius: "45% 55% 42% 58% / 55% 45% 55% 45%" };
+
+const GALLERY = [
+  {
+    src: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800",
+    alt: "Community meal being shared",
+    title: "Shared meals",
+    text: "Cooked food reaches communities the same day.",
+    tint: "bg-[#F2B01E]",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?w=800",
+    alt: "Children eating together",
+    title: "Children fed",
+    text: "Orphanages and schools get fresh surplus.",
+    tint: "bg-[#8FD19E]",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=800",
+    alt: "Volunteer handing out food",
+    title: "Volunteers on the move",
+    text: "Pickups and deliveries by people nearby.",
+    tint: "bg-[#FF7A59]",
+  },
+];
+
+function useNow(interval = 1000) {
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    let current = 0
-    const increment = Math.ceil(end / 50)
+    const t = setInterval(() => setNow(Date.now()), interval);
+    return () => clearInterval(t);
+  }, [interval]);
+  return now;
+}
 
-    const timer = setInterval(() => {
-      current += increment
+const LEVEL_STYLE = {
+  critical: { time: "text-[#FF7A59]", dot: "bg-[#FF7A59]" },
+  urgent: { time: "text-[#F2B01E]", dot: "bg-[#F2B01E]" },
+  safe: { time: "text-[#8FD19E]", dot: "bg-[#8FD19E]" },
+  unknown: { time: "text-[#9DB3A5]", dot: "bg-[#9DB3A5]" },
+};
 
-      if (current >= end) {
-        setCount(end)
-        clearInterval(timer)
-      } else {
-        setCount(current)
-      }
-    }, 30)
+function BoardRow({ donation, now }) {
+  const ms = msRemaining(donation, now);
+  const level = urgencyLevel(ms);
+  const style = LEVEL_STYLE[level] || LEVEL_STYLE.unknown;
 
-    return () => clearInterval(timer)
-  }, [end])
-
-  return <>{count.toLocaleString()}+</>
+  return (
+    <li className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 py-2.5 border-t border-white/10">
+      <div className="flex items-center gap-2">
+        <span
+          className={`w-2 h-2 rounded-full ${style.dot} ${
+            level === "critical" ? "motion-safe:animate-pulse" : ""
+          }`}
+          aria-hidden="true"
+        />
+        <span className={`text-lg font-semibold tabular-nums ${style.time}`}>
+          {formatRemaining(ms)}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm text-[#EAF4EE] font-medium truncate">{donation.foodItems?.[0]?.name}</p>
+        <p className="text-xs text-[#9DB3A5] truncate">
+          {donation.totalQuantity} from {donation.pickupLocation}
+        </p>
+      </div>
+    </li>
+  );
 }
 
 function Home() {
+  const { donations = [], users = [] } = useAuth();
+  const now = useNow();
+
+  const rescuable = donations
+    .filter((d) => d.status === "available" && (msRemaining(d, now) ?? 1) > 0)
+    .sort((a, b) => priorityScore(b, now) - priorityScore(a, now));
+
+  const boardRows = rescuable.slice(0, 3);
+
+  const qty = (d) => parseInt(d.totalQuantity, 10) || 0;
+  const mealsDelivered = donations.filter((d) => d.status === "delivered").reduce((s, d) => s + qty(d), 0);
+  const mealsWaiting = rescuable.reduce((s, d) => s + qty(d), 0);
+  const activeNgos = users.filter((u) => u.role === "ngo" && u.status === "approved").length;
+  const peopleReached = donations.reduce((s, d) => s + (d.distribution?.estimatedPeopleHelped || 0), 0);
+  const totalMeals = donations.reduce((s, d) => s + qty(d), 0);
+  const deliveredPercent = totalMeals ? Math.round((mealsDelivered / totalMeals) * 100) : 0;
+
+  const stats = [
+    { icon: "bowl", value: mealsDelivered, label: "Meals delivered" },
+    { icon: "truck", value: mealsWaiting, label: "Awaiting pickup" },
+    { icon: "handshake", value: activeNgos, label: "NGO partners" },
+    { icon: "users", value: peopleReached, label: "People reached" },
+  ];
+
+  const steps = [
+    { icon: "bowl", title: "Donor posts food", text: "Quantity, pickup spot and expiry time.", ring: "bg-[#FFE9A8] text-[#8A5A00]", top: "border-[#F2B01E]" },
+    { icon: "search", title: "NGO claims it", text: "Soonest-to-expire food shows first.", ring: "bg-[#DDF2E2] text-[#2F7A55]", top: "border-[#8FD19E]" },
+    { icon: "check", title: "Donor approves", text: "Confirms who is coming to collect.", ring: "bg-[#FFE0D8] text-[#D2542F]", top: "border-[#FF7A59]" },
+    { icon: "truck", title: "Food is delivered", text: "Picked up, on the way, delivered.", ring: "bg-[#0F2E22] text-[#F2B01E]", top: "border-[#0F2E22]" },
+  ];
+
+  const focus =
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F2E22]";
+
   return (
-    <div className="min-h-screen bg-[#f8faf6] text-gray-800">
+    <div className="min-h-screen bg-[#F6F7F2] text-[#14231B] overflow-x-hidden" style={FONT}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Caveat:wght@600&display=swap');`}</style>
 
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#edf6e8]">
-        <div className="max-w-7xl mx-auto px-6 py-16 lg:py-24 grid lg:grid-cols-2 gap-12 items-center">
-
+      {/* ============ HERO ============ */}
+      <section className="relative">
+        <div className="relative max-w-6xl mx-auto px-6 pt-10 pb-16 grid lg:grid-cols-[1fr_1.05fr] gap-10 items-center">
           <div>
-            <p className="text-green-700 font-semibold uppercase tracking-[3px] text-sm">
-              FoodShare
+            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-[#9A6B00]">
+              Reduce food waste • Feed communities
             </p>
 
-            <h1 className="mt-5 text-5xl md:text-6xl lg:text-7xl font-bold text-[#214d2b] leading-tight">
-              Good Food.
-              <br />
-              <span className="text-green-600">
-                Better Purpose.
-              </span>
+            <h1 className="mt-3 text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.05] tracking-tight text-[#0F2E22]">
+              Good food has a clock on it.
             </h1>
 
-            <p className="mt-6 text-lg text-gray-600 max-w-xl leading-8">
-              Turn surplus food into meaningful support. FoodShare connects
-              restaurants, hotels, cafeterias, households, NGOs and volunteers
-              to make sure safe food reaches people who need it.
+            <p className="mt-5 text-base leading-7 text-[#3B4F43] max-w-lg">
+              Restaurants, hotels and homes post what they can't use. NGOs and
+              volunteers collect it before it spoils and deliver it to people
+              who are hungry today.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-4">
-
+            <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 to="/register"
-                className="px-7 py-3.5 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 transition"
+                className={`inline-flex items-center px-7 py-3 rounded-full bg-[#0F2E22] text-white font-semibold hover:bg-[#184230] transition shadow-lg shadow-[#0F2E22]/20 ${focus}`}
               >
-                Donate Food →
+                Start donating
               </Link>
-
               <Link
-                to="/"
-                className="px-7 py-3.5 border border-green-700 text-green-700 rounded-lg font-semibold hover:bg-green-100 transition"
+                to="/available-food"
+                className={`inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#F2B01E] text-[#0F2E22] font-semibold hover:bg-[#FFC53D] transition ${focus}`}
               >
-                Find Food
+                <Icon name="search" className="w-4 h-4" />
+                Find food
               </Link>
-
             </div>
 
-            <div className="mt-10 grid grid-cols-3 gap-5">
-
-              <div>
-                <div className="text-3xl">♻️</div>
-                <p className="mt-2 font-semibold">
-                  Less Waste
-                </p>
-                <p className="text-sm text-gray-500">
-                  Save surplus food
-                </p>
-              </div>
-
-              <div>
-                <div className="text-3xl">🤝</div>
-                <p className="mt-2 font-semibold">
-                  More Sharing
-                </p>
-                <p className="text-sm text-gray-500">
-                  Support communities
-                </p>
-              </div>
-
-              <div>
-                <div className="text-3xl">🌱</div>
-                <p className="mt-2 font-semibold">
-                  Real Impact
-                </p>
-                <p className="text-sm text-gray-500">
-                  Build sustainability
-                </p>
-              </div>
-
+            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-[#3B4F43]">
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="shield" className="w-4 h-4 text-[#2F7A55]" /> Safe, 3h+
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="bolt" className="w-4 h-4 text-[#E0A21B]" /> Urgent, 1 to 3h
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="star" className="w-4 h-4 text-[#E2724A]" /> Critical, under 1h
+              </span>
             </div>
           </div>
 
+          {/* ব্লব ছবি + Rescue Board */}
           <div className="relative">
-
-            <div className="absolute -inset-5 bg-green-300/30 rounded-[2rem] blur-2xl"></div>
-
-           <img
-  src={foodImage}
-  alt="FoodShare"
-  className="relative w-full h-[500px] object-cover rounded-[2rem] shadow-2xl"
-/>
-
-            <div className="absolute left-6 bottom-6 bg-white rounded-xl shadow-xl p-5">
-              <p className="text-sm text-gray-500">
-                Together we can save
-              </p>
-
-              <p className="text-2xl font-bold text-green-700">
-                Good Food, Not Waste
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* Introduction */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-14 items-center">
-
-          <div>
-            <p className="text-green-600 font-semibold uppercase tracking-widest text-sm">
-              Our Mission
-            </p>
-
-            <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#214d2b] leading-tight">
-              From Surplus Food
-              <br />
-              To Someone in Need.
-            </h2>
-
-            <p className="mt-6 text-gray-600 leading-8">
-              Every day, restaurants, hotels, events and households may have
-              safe food left over. Instead of throwing it away, FoodShare
-              helps connect that food with NGOs and volunteers who can collect
-              and distribute it.
-            </p>
-
-            <Link
-              to="/about"
-              className="inline-block mt-7 px-6 py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 transition"
-            >
-              Learn More →
-            </Link>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-5">
-
-            <div className="bg-[#f5faf2] p-7 rounded-2xl border border-green-100 hover:shadow-lg transition">
-              <div className="text-4xl">🍱</div>
-              <h3 className="mt-4 text-xl font-bold">
-                Donate Surplus Food
-              </h3>
-              <p className="mt-3 text-gray-600">
-                Post whatever safe surplus food is available.
-              </p>
-            </div>
-
-            <div className="bg-[#f5faf2] p-7 rounded-2xl border border-green-100 hover:shadow-lg transition">
-              <div className="text-4xl">🔎</div>
-              <h3 className="mt-4 text-xl font-bold">
-                Find Available Food
-              </h3>
-              <p className="mt-3 text-gray-600">
-                NGOs and volunteers can discover nearby donations.
-              </p>
-            </div>
-
-            <div className="bg-[#f5faf2] p-7 rounded-2xl border border-green-100 hover:shadow-lg transition">
-              <div className="text-4xl">🚚</div>
-              <h3 className="mt-4 text-xl font-bold">
-                Collect & Deliver
-              </h3>
-              <p className="mt-3 text-gray-600">
-                Coordinate pickup and deliver food to communities.
-              </p>
-            </div>
-
-            <div className="bg-[#f5faf2] p-7 rounded-2xl border border-green-100 hover:shadow-lg transition">
-              <div className="text-4xl">❤️</div>
-              <h3 className="mt-4 text-xl font-bold">
-                Create Impact
-              </h3>
-              <p className="mt-3 text-gray-600">
-                Reduce food waste while helping people in need.
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* How FoodShare Works */}
-      <section className="py-20 bg-[#f3f8ef]">
-        <div className="max-w-7xl mx-auto px-6">
-
-          <div className="text-center max-w-2xl mx-auto">
-
-            <p className="text-green-600 font-semibold uppercase tracking-widest text-sm">
-              Simple & Meaningful
-            </p>
-
-            <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#214d2b]">
-              How FoodShare Works
-            </h2>
-
-            <p className="mt-5 text-gray-600 leading-7">
-              Our platform makes it easy to move surplus food from donors
-              to people who need it through trusted NGOs and volunteers.
-            </p>
-
-          </div>
-
-          <div className="relative mt-14">
-
-            <div className="hidden md:block absolute top-12 left-[13%] right-[13%] border-t-2 border-dashed border-green-300"></div>
-
-            <div className="grid md:grid-cols-4 gap-8 relative">
-
-              <div className="text-center">
-                <div className="mx-auto w-24 h-24 flex items-center justify-center rounded-full bg-green-100 border-8 border-white shadow-md text-4xl">
-                  🍱
-                </div>
-
-                <span className="inline-block mt-5 text-sm font-bold text-green-600">
-                  STEP 01
-                </span>
-
-                <h3 className="mt-2 text-xl font-bold">
-                  Donor Posts Food
-                </h3>
-
-                <p className="mt-3 text-gray-600">
-                  A restaurant, hotel, cafeteria or individual posts
-                  available surplus food with quantity and pickup details.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto w-24 h-24 flex items-center justify-center rounded-full bg-green-100 border-8 border-white shadow-md text-4xl">
-                  🔎
-                </div>
-
-                <span className="inline-block mt-5 text-sm font-bold text-green-600">
-                  STEP 02
-                </span>
-
-                <h3 className="mt-2 text-xl font-bold">
-                  NGO Finds Food
-                </h3>
-
-                <p className="mt-3 text-gray-600">
-                  NGOs or volunteers browse available donations and
-                  request food based on their needs.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto w-24 h-24 flex items-center justify-center rounded-full bg-green-100 border-8 border-white shadow-md text-4xl">
-                  ✅
-                </div>
-
-                <span className="inline-block mt-5 text-sm font-bold text-green-600">
-                  STEP 03
-                </span>
-
-                <h3 className="mt-2 text-xl font-bold">
-                  Request Approved
-                </h3>
-
-                <p className="mt-3 text-gray-600">
-                  The donor reviews the request and confirms the
-                  suitable NGO or volunteer for collection.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto w-24 h-24 flex items-center justify-center rounded-full bg-green-100 border-8 border-white shadow-md text-4xl">
-                  🚚
-                </div>
-
-                <span className="inline-block mt-5 text-sm font-bold text-green-600">
-                  STEP 04
-                </span>
-
-                <h3 className="mt-2 text-xl font-bold">
-                  Food Is Delivered
-                </h3>
-
-                <p className="mt-3 text-gray-600">
-                  The food is collected and delivered to people
-                  or communities who need it.
-                </p>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-
-      {/* What Can You Share */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6">
-
-          <div className="text-center max-w-2xl mx-auto">
-
-            <p className="text-green-600 font-semibold uppercase tracking-widest text-sm">
-              Every Day Is Different
-            </p>
-
-            <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#214d2b]">
-              Share Any Safe, Surplus Food
-            </h2>
-
-            <p className="mt-5 text-gray-600 leading-7">
-              You don't need to follow a fixed food list. Share whatever
-              safe and suitable surplus food is available from your
-              restaurant, hotel, cafeteria, event or home.
-            </p>
-
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mt-12">
-
-            {[
-              ["🍛", "Cooked Meals"],
-              ["🍚", "Rice & Curry"],
-              ["🥪", "Snacks & Fast Food"],
-              ["🍞", "Bakery Items"],
-              ["🍱", "Event Surplus"],
-              ["🥫", "Other Food"]
-            ].map(([icon, title]) => (
-              <div
-                key={title}
-                className="group bg-[#f8fbf6] border border-green-100 rounded-2xl p-6 text-center hover:-translate-y-2 hover:shadow-lg transition"
-              >
-                <div className="text-5xl">
-                  {icon}
-                </div>
-
-                <h3 className="mt-4 font-semibold text-gray-800">
-                  {title}
-                </h3>
-
-                <p className="mt-2 text-xs text-gray-500">
-                  Example
-                </p>
-              </div>
-            ))}
-
-          </div>
-
-          <p className="text-center mt-8 text-gray-500 text-sm">
-            These are examples only. Donors can describe the actual
-            surplus food available when creating a donation.
-          </p>
-
-        </div>
-      </section>
-
-
-      {/* Impact */}
-      {/* <section className="py-20 bg-green-800 text-white">
-        <div className="max-w-7xl mx-auto px-6">
-
-          <div className="text-center">
-
-            <p className="text-green-200 font-semibold uppercase tracking-widest text-sm">
-              Our Impact
-            </p>
-
-            <h2 className="mt-3 text-4xl md:text-5xl font-bold">
-              Together, We Make a Difference.
-            </h2>
-
-            <p className="mt-4 text-green-100">
-              Every donation can become someone's meal.
-            </p>
-
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
-
-            <div className="text-center bg-green-700/50 border border-green-600 rounded-2xl p-8">
-              <div className="text-4xl font-bold">
-                <Counter end={5000} />
-              </div>
-
-              <p className="mt-2 text-green-100">
-                Meals Saved
-              </p>
-            </div>
-
-            <div className="text-center bg-green-700/50 border border-green-600 rounded-2xl p-8">
-              <div className="text-4xl font-bold">
-                <Counter end={250} />
-              </div>
-
-              <p className="mt-2 text-green-100">
-                Food Donors
-              </p>
-            </div>
-
-            <div className="text-center bg-green-700/50 border border-green-600 rounded-2xl p-8">
-              <div className="text-4xl font-bold">
-                <Counter end={80} />
-              </div>
-
-              <p className="mt-2 text-green-100">
-                NGO Partners
-              </p>
-            </div>
-
-            <div className="text-center bg-green-700/50 border border-green-600 rounded-2xl p-8">
-              <div className="text-4xl font-bold">
-                <Counter end={1200} />
-              </div>
-
-              <p className="mt-2 text-green-100">
-                People Helped
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-      </section> */}
-       {/* Impact Section */}
-
-{/* Impact Section */}
-<section className="py-12 bg-[#f3f8ef]">
-  <div className="max-w-6xl mx-auto px-6">
-
-    <div className="grid lg:grid-cols-2 gap-10 items-center">
-
-      {/* Image */}
-      <div className="relative">
-        <div className="absolute -inset-3 bg-green-200/40 rounded-[1.5rem] blur-xl"></div>
-
-        <img
-          src={impactImage}
-          alt="Food sharing"
-          className="relative w-full h-[330px] object-cover rounded-[1.5rem] shadow-lg"
-        />
-
-        <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg p-4 shadow-md">
-          <p className="text-xs text-gray-500">
-            Every donation matters
-          </p>
-
-          <p className="text-lg font-bold text-green-700 mt-1">
-            Good Food. Shared With Purpose. ❤️
-          </p>
-        </div>
-      </div>
-
-      {/* Information */}
-      <div>
-
-        <p className="text-green-600 font-semibold uppercase tracking-widest text-xs">
-          Our Impact
-        </p>
-
-        <h2 className="mt-2 text-3xl md:text-4xl font-bold text-[#214d2b] leading-tight">
-          Together, We Make
-          <br />
-          <span className="text-green-600">
-            A Difference.
-          </span>
-        </h2>
-
-        <p className="mt-4 text-gray-600 leading-7 max-w-xl text-sm">
-          FoodShare brings donors, NGOs and volunteers together to
-          make sure safe surplus food does not go to waste. Every
-          donation can become a meal and every small action can create
-          a meaningful impact in the community.
-        </p>
-
-        {/* Impact Stats */}
-        <div className="grid grid-cols-2 gap-3 mt-6">
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-            <div className="text-2xl font-bold text-green-700">
-              <Counter end={5000} />
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Meals Saved
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-            <div className="text-2xl font-bold text-green-700">
-              <Counter end={250} />
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Food Donors
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-            <div className="text-2xl font-bold text-green-700">
-              <Counter end={80} />
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              NGO Partners
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-            <div className="text-2xl font-bold text-green-700">
-              <Counter end={1200} />
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              People Helped
-            </p>
-          </div>
-
-        </div>
-
-        {/* Button */}
-        <Link
-          to="/register"
-          className="inline-block mt-6 px-6 py-3 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition shadow-md"
-        >
-          Be Part of the Change →
-        </Link>
-
-      </div>
-
-    </div>
-
-  </div>
-</section>
-
-      {/* CTA */}
-      <section className="relative overflow-hidden bg-[#edf6e8] py-20">
-
-        <div className="max-w-4xl mx-auto px-6 text-center">
-
-          <div className="text-5xl">
-            🌱
-          </div>
-
-          <h2 className="mt-5 text-4xl md:text-5xl font-bold text-[#214d2b]">
-            Have Extra Food?
-          </h2>
-
-          <p className="mt-5 text-lg text-gray-600 max-w-2xl mx-auto leading-8">
-            Don't let good food go to waste. Post your surplus food
-            and help someone in your community.
-          </p>
-
-          <Link
-            to="/register"
-            className="inline-block mt-8 px-8 py-4 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 transition shadow-lg"
-          >
-            Start Donating Today →
-          </Link>
-
-        </div>
-
-      </section>
-
-
-      {/* Newsletter */}
-      <section className="bg-[#214d2b] py-12">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-
-          <h2 className="text-2xl md:text-3xl font-bold text-white">
-            Stay Connected With FoodShare
-          </h2>
-
-          <p className="mt-3 text-green-100">
-            Get updates about food sharing and community impact.
-          </p>
-
-          <form className="mt-7 flex flex-col sm:flex-row max-w-xl mx-auto gap-3">
-
-            <input
-              type="email"
-              placeholder="Enter your email address"
-              className="flex-1 px-5 py-3 rounded-lg outline-none bg-white text-gray-800"
+            <span className="absolute -top-4 -right-4 w-[92%] h-[92%] bg-[#F2B01E]" style={BLOB_B} aria-hidden="true" />
+            <span className="absolute -bottom-3 left-8 w-32 h-32 rounded-full bg-[#FFE0D8]" aria-hidden="true" />
+            <img
+              src={heroImage}
+              alt="Surplus food being shared"
+              className="relative w-full h-[280px] lg:h-[330px] object-cover shadow-xl"
+              style={BLOB_A}
             />
 
-            <button
-              type="submit"
-              className="px-7 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-400 transition"
+            <p
+              className="hidden xl:block absolute -right-6 top-2 text-3xl leading-8 text-[#0F2E22] -rotate-6"
+              style={SCRIPT}
+              aria-hidden="true"
             >
-              Subscribe
-            </button>
+              Share Food
+              <br />
+              Share Hope
+            </p>
 
-          </form>
+            <div
+              className="absolute -bottom-10 left-2 right-2 sm:right-auto sm:-left-6 sm:w-80 bg-[#0F2E22] rounded-2xl p-4 shadow-2xl ring-4 ring-[#F6F7F2]"
+              aria-live="polite"
+            >
+              <div className="flex items-baseline justify-between mb-1.5">
+                <h2 className="text-sm font-semibold text-[#EAF4EE]">Waiting for rescue</h2>
+                <Link to="/available-food" className="text-xs font-semibold text-[#F2B01E] hover:underline underline-offset-4">
+                  See all
+                </Link>
+              </div>
 
+              {boardRows.length === 0 ? (
+                <p className="border-t border-white/10 pt-2.5 text-xs text-[#9DB3A5]">
+                  Nothing is waiting right now. New posts appear here with a countdown.
+                </p>
+              ) : (
+                <ul>
+                  {boardRows.map((d) => (
+                    <BoardRow key={d.id} donation={d} now={now} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ LIVE IMPACT ============ */}
+      <div className="mt-6">
+        <LiveStats stats={stats} progress={{ percent: deliveredPercent, label: "Delivered so far" }} />
+      </div>
+
+      {/* ============ HOW IT WORKS ============ */}
+      <section className="max-w-6xl mx-auto px-6 py-12 grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
+        <div className="relative max-w-md mx-auto lg:max-w-none w-full">
+          <span className="absolute -bottom-3 -left-3 w-[92%] h-[92%] bg-[#F2B01E]" style={BLOB_A} aria-hidden="true" />
+          <span className="absolute -top-3 right-4 w-24 h-24 rounded-full bg-[#FFE0D8]" aria-hidden="true" />
+          <img
+            src={stepsImage}
+            alt="Food being packed for delivery"
+            className="relative w-full h-[260px] lg:h-[300px] object-cover shadow-lg"
+            style={BLOB_B}
+          />
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold tracking-[0.16em] uppercase text-[#9A6B00]">How it works</p>
+          <h2 className="mt-2 text-2xl md:text-4xl font-bold text-[#0F2E22] leading-tight">
+            From a kitchen to a plate, before the food turns.
+          </h2>
+
+          <ol className="mt-6 grid sm:grid-cols-2 gap-3">
+            {steps.map((s, i) => (
+              <li
+                key={s.title}
+                className={`bg-white rounded-2xl p-4 border-t-4 ${s.top} shadow-sm flex gap-3 items-start`}
+              >
+                <span className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center ${s.ring}`}>
+                  <Icon name={s.icon} className="w-5 h-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold text-[#0F2E22]/50 tabular-nums">Step {i + 1}</p>
+                  <h3 className="font-semibold leading-snug text-[#14231B]">{s.title}</h3>
+                  <p className="mt-0.5 text-sm text-[#3B4F43] leading-5">{s.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ============ GALLERY: Where the food ends up ============ */}
+      <section className="bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <h2 className="text-2xl md:text-4xl font-bold text-[#0F2E22] leading-tight">
+            Where the food ends up.
+          </h2>
+
+          <div className="mt-8 grid md:grid-cols-3 gap-5">
+            {GALLERY.map((g) => (
+              <figure key={g.title} className="relative">
+                <div className={`absolute -bottom-2 -right-2 w-full h-full rounded-3xl ${g.tint}`} aria-hidden="true" />
+                <div className="relative h-60 rounded-3xl overflow-hidden group">
+                  <img
+                    src={g.src}
+                    alt={g.alt}
+                    className="w-full h-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-105"
+                  />
+                  <figcaption className="absolute inset-x-0 bottom-0 px-5 pb-4 pt-12 bg-gradient-to-t from-[#0F2E22] via-[#0F2E22]/60 to-transparent">
+                    <p className="font-semibold text-white">{g.title}</p>
+                    <p className="text-xs text-[#DCE9E0]">{g.text}</p>
+                  </figcaption>
+                </div>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ MISSION BANNER (ছবির ব্যাকগ্রাউন্ড) ============ */}
+      <section className="max-w-6xl mx-auto px-6 py-10">
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#0F2E22] px-6 md:px-10 py-9 md:py-10">
+          <img
+            src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-[#0F2E22]/85" aria-hidden="true" />
+
+          <div className="relative grid md:grid-cols-[1.3fr_1fr] gap-6 items-center">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.16em] uppercase text-[#F2B01E]">Our mission</p>
+              <h2 className="mt-2 text-3xl md:text-4xl font-bold text-white">From surplus to support.</h2>
+              <p className="mt-3 text-sm md:text-base text-[#DCE9E0] leading-7 max-w-lg">
+                We rescue good food from restaurants, cafes and events and deliver
+                it to NGOs, families and communities in need.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3 md:justify-end">
+              <Link
+                to="/register"
+                className="inline-flex items-center px-7 py-3 rounded-full bg-[#F2B01E] text-[#0F2E22] font-semibold hover:bg-[#FFC53D] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Donate food
+              </Link>
+              <Link
+                to="/about"
+                className="inline-flex items-center px-7 py-3 rounded-full border-2 border-white/80 text-white font-semibold hover:bg-white/10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Learn more
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
       <Footer />
-
     </div>
-  )
+  );
 }
 
-export default Home
+export default Home;
