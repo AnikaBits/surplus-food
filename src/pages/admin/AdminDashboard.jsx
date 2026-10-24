@@ -1,12 +1,6 @@
-// src/pages/admin/AdminDashboard.jsx
-// নতুন ডিজাইন: গাঢ় সবুজ সাইডবার (আইকন + pending ব্যাজ), হলুদ active ট্যাব,
-// ওপরে পেজের শিরোনাম। লজিক আগের মতোই।
-// দরকার: components/LiveStats.jsx (Icon এক্সপোর্ট, নতুন আইকনসহ)
-
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Icon } from "../../components/LiveStats";
 
 import PendingApprovals from "./sections/PendingApprovals";
 import AllUsers from "./sections/AllUsers";
@@ -16,121 +10,384 @@ import AnalyticsDashboard from "./sections/AnalyticsDashboard";
 import Complaints from "./sections/Complaints";
 import MoneyDonationLog from "./sections/MoneyDonationLog";
 
-const FONT = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
-
-const TABS = [
-  { id: "pendingApprovals", label: "Pending approvals", icon: "clock", desc: "Review new donors and NGOs before they can use the platform." },
-  { id: "allUsers", label: "All users", icon: "users", desc: "Every donor and NGO account. Block or unblock when needed." },
-  { id: "allDonations", label: "All donations", icon: "list", desc: "Every food listing and where it stands right now." },
-  { id: "transactionTrail", label: "Transaction trail", icon: "route", desc: "Follow one donation from the donor's kitchen to the last plate." },
-  { id: "analytics", label: "Analytics", icon: "chart", desc: "How much food is moving, and where it goes." },
-  { id: "complaints", label: "Complaints", icon: "flag", desc: "Reports from donors and NGOs waiting for a response." },
-  { id: "moneyLog", label: "Money donation log", icon: "wallet", desc: "Every fund donation received through the platform." },
-];
-
 function AdminDashboard() {
-  const { currentUser, logout, users = [] } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("pendingApprovals");
 
-  const pendingCount = users.filter((u) => u.status === "pending").length;
-  const active = TABS.find((t) => t.id === activeTab);
+  const [activeTab, setActiveTab] = useState("pendingApprovals");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const tabs = [
+    {
+      id: "pendingApprovals",
+      label: "Pending Approvals",
+      icon: "⏳",
+      description: "Review and manage pending user approvals",
+    },
+    {
+      id: "allUsers",
+      label: "All Users",
+      icon: "👥",
+      description: "View and manage registered platform users",
+    },
+    {
+      id: "allDonations",
+      label: "All Donations",
+      icon: "🍱",
+      description: "Monitor food donations across the platform",
+    },
+    {
+      id: "transactionTrail",
+      label: "Transaction Trail",
+      icon: "🔄",
+      description: "Track food donation and collection activities",
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: "📊",
+      description: "Explore platform statistics and insights",
+    },
+    {
+      id: "complaints",
+      label: "Complaints",
+      icon: "📩",
+      description: "Review and manage reported complaints",
+    },
+    {
+      id: "moneyLog",
+      label: "Money Donation Log",
+      icon: "💰",
+      description: "Review recorded monetary donations",
+    },
+  ];
+
+  const activeTabInfo =
+    tabs.find((tab) => tab.id === activeTab) || tabs[0];
+
+  const adminName = currentUser?.name || "FoodShare Admin";
 
   function handleLogout() {
     logout();
     navigate("/login");
   }
 
-  const views = {
-    pendingApprovals: <PendingApprovals />,
-    allUsers: <AllUsers />,
-    allDonations: <AllDonations />,
-    transactionTrail: <TransactionTrail />,
-    analytics: <AnalyticsDashboard />,
-    complaints: <Complaints />,
-    moneyLog: <MoneyDonationLog />,
-  };
+  function handleTabChange(tabId) {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+  }
 
   return (
-    <div className="min-h-screen bg-[#F6F7F2] text-[#14231B] flex flex-col lg:flex-row" style={FONT}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap');`}</style>
+    <div className="min-h-screen bg-[#f5faf6] flex">
 
-      {/* ============ সাইডবার ============ */}
-      <aside className="lg:w-64 lg:shrink-0 bg-[#0F2E22] text-white p-4 lg:p-5 lg:sticky lg:top-0 lg:h-screen flex flex-col">
-        <div className="flex items-center gap-3 lg:mb-6">
-          <img
-            src={currentUser?.image}
-            alt=""
-            className="w-11 h-11 rounded-full object-cover bg-white/10 ring-2 ring-[#F2B01E]"
-          />
-          <div className="min-w-0">
-            <p className="font-semibold truncate">{currentUser?.name}</p>
-            <span className="inline-block mt-0.5 text-[11px] font-semibold tracking-wide uppercase rounded-full bg-[#F2B01E] text-[#0F2E22] px-2 py-0.5">
-              Admin
-            </span>
+      {/* MOBILE OVERLAY */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* SIDEBAR */}
+      <aside
+        className={`
+          fixed md:sticky top-0 left-0 z-50
+          h-screen w-72 shrink-0
+          bg-white border-r border-green-100
+          flex flex-col shadow-lg md:shadow-none
+          transition-transform duration-300
+          ${
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full md:translate-x-0"
+          }
+        `}
+      >
+
+        {/* BRAND */}
+        <div className="px-6 py-7 border-b border-green-100">
+
+          <div className="flex items-center justify-between">
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-12 h-12 bg-gradient-to-br from-green-700 to-emerald-500 rounded-2xl flex items-center justify-center text-2xl text-white shadow-md">
+                🌿
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-extrabold text-green-900">
+                  FoodShare
+                </h2>
+
+                <p className="text-xs text-gray-400 font-medium">
+                  Admin Control Panel
+                </p>
+              </div>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden text-gray-500 text-xl"
+              aria-label="Close sidebar"
+            >
+              ✕
+            </button>
+
           </div>
+
         </div>
 
-        <nav className="mt-4 lg:mt-0 flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0" aria-label="Admin sections">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                aria-current={isActive ? "page" : undefined}
-                className={`shrink-0 flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F2B01E] ${
-                  isActive
-                    ? "bg-[#F2B01E] text-[#0F2E22]"
-                    : "text-[#CFE0D5] hover:bg-white/10"
-                }`}
-              >
-                <Icon name={tab.icon} className="w-[18px] h-[18px] shrink-0" />
-                <span className="whitespace-nowrap">{tab.label}</span>
-                {tab.id === "pendingApprovals" && pendingCount > 0 && (
-                  <span
-                    className={`ml-auto text-[11px] font-bold rounded-full px-2 py-0.5 ${
-                      isActive ? "bg-[#0F2E22] text-[#F2B01E]" : "bg-[#E5322D] text-white"
-                    }`}
-                  >
-                    {pendingCount}
-                  </span>
+        {/* ADMIN PROFILE */}
+        <div className="px-5 py-6">
+
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-2xl p-4">
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-12 h-12 rounded-full border-2 border-white shadow-sm overflow-hidden bg-green-100 flex items-center justify-center shrink-0">
+
+                {currentUser?.image ? (
+                  <img
+                    src={currentUser.image}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl">🛡️</span>
                 )}
-              </button>
-            );
-          })}
-        </nav>
 
-        <button
-          onClick={handleLogout}
-          className="mt-3 lg:mt-auto flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-[#FFB4A8] hover:bg-white/10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F2B01E]"
-        >
-          <Icon name="logout" className="w-[18px] h-[18px]" />
-          Logout
-        </button>
-      </aside>
+              </div>
 
-      {/* ============ মূল অংশ ============ */}
-      <main className="flex-1 min-w-0 p-5 md:p-8">
-        <header className="flex flex-wrap items-start justify-between gap-4 mb-7">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-[#0F2E22]">{active.label}</h1>
-            <p className="mt-1 text-sm text-[#3B4F43] max-w-xl">{active.desc}</p>
+              <div className="min-w-0">
+
+                <p className="font-bold text-green-950 text-sm truncate">
+                  {adminName}
+                </p>
+
+                <p className="text-xs text-green-700 mt-1">
+                  Platform Administrator
+                </p>
+
+              </div>
+
+            </div>
+
           </div>
 
-          {pendingCount > 0 && activeTab !== "pendingApprovals" && (
-            <button
-              onClick={() => setActiveTab("pendingApprovals")}
-              className="inline-flex items-center gap-2 rounded-full bg-[#FFF1CC] border border-[#F2B01E] px-4 py-2 text-sm font-semibold text-[#5A4300] hover:bg-[#FFE9A8] transition"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#E5322D]" aria-hidden="true" />
-              {pendingCount} waiting for approval
-            </button>
-          )}
+        </div>
+
+        {/* NAVIGATION */}
+        <div className="flex-1 overflow-y-auto px-4 pb-5">
+
+          <p className="px-4 mb-4 text-xs font-bold tracking-widest text-gray-400 uppercase">
+            Administration
+          </p>
+
+          <nav className="space-y-2">
+
+            {tabs.map((tab) => (
+
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                aria-current={
+                  activeTab === tab.id ? "page" : undefined
+                }
+                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                  activeTab === tab.id
+                    ? "bg-gradient-to-r from-green-700 to-emerald-500 text-white shadow-md"
+                    : "text-gray-600 hover:bg-green-50 hover:text-green-800"
+                }`}
+              >
+
+                <span className="text-xl">
+                  {tab.icon}
+                </span>
+
+                <span className="text-left">
+                  {tab.label}
+                </span>
+
+                {activeTab === tab.id && (
+                  <span className="ml-auto">→</span>
+                )}
+
+              </button>
+
+            ))}
+
+          </nav>
+
+        </div>
+
+        {/* SIDEBAR FOOTER */}
+        <div className="p-5 border-t border-green-100">
+
+          <div className="bg-green-50 rounded-xl p-4 mb-4">
+
+            <p className="text-xs font-bold text-green-800">
+              💚 FoodShare Administration
+            </p>
+
+            <p className="mt-2 text-xs text-gray-500 leading-5">
+              Managing a safer and more connected
+              food-sharing community.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-red-50 text-red-700 rounded-xl text-sm font-bold hover:bg-red-100 transition"
+          >
+            <span className="text-lg">🚪</span>
+            Logout
+          </button>
+
+        </div>
+
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 min-w-0">
+
+        {/* TOP HEADER */}
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-green-100 px-5 sm:px-8 py-4">
+
+          <div className="flex items-center justify-between gap-4">
+
+            <div className="flex items-center gap-4 min-w-0">
+
+              {/* MOBILE MENU */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden w-11 h-11 shrink-0 flex items-center justify-center bg-green-50 text-green-800 rounded-xl text-2xl"
+                aria-label="Open sidebar"
+              >
+                ☰
+              </button>
+
+              <div className="min-w-0">
+
+                <p className="text-xs text-gray-400 font-semibold">
+                  FoodShare Administration
+                </p>
+
+                <h1 className="text-lg sm:text-2xl font-extrabold text-green-950 truncate">
+                  {activeTabInfo.label}
+                </h1>
+
+              </div>
+
+            </div>
+
+            {/* HEADER PROFILE */}
+            <div className="flex items-center gap-3 shrink-0">
+
+              <div className="hidden sm:block text-right">
+
+                <p className="text-sm font-bold text-green-950 max-w-40 truncate">
+                  {adminName}
+                </p>
+
+                <p className="text-xs text-gray-400">
+                  Administrator
+                </p>
+
+              </div>
+
+              <div className="w-11 h-11 rounded-full bg-green-100 border-2 border-green-200 overflow-hidden flex items-center justify-center">
+
+                {currentUser?.image ? (
+                  <img
+                    src={currentUser.image}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-xl">🛡️</span>
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
         </header>
 
-        {views[activeTab]}
-      </main>
+        {/* DASHBOARD CONTENT */}
+        <main className="p-5 sm:p-8 lg:p-10">
+
+          <div className="max-w-7xl mx-auto space-y-7">
+
+            {/* SECTION INTRO */}
+            <div className="flex items-center gap-4">
+
+              <div className="w-12 h-12 shrink-0 bg-green-100 rounded-2xl flex items-center justify-center text-2xl">
+                {activeTabInfo.icon}
+              </div>
+
+              <div>
+
+                <h2 className="text-xl sm:text-2xl font-extrabold text-green-950">
+                  {activeTabInfo.label}
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  {activeTabInfo.description}
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* ACTIVE SECTION */}
+            <div>
+
+              {activeTab === "pendingApprovals" && (
+                <PendingApprovals />
+              )}
+
+              {activeTab === "allUsers" && (
+                <AllUsers />
+              )}
+
+              {activeTab === "allDonations" && (
+                <AllDonations />
+              )}
+
+              {activeTab === "transactionTrail" && (
+                <TransactionTrail />
+              )}
+
+              {activeTab === "analytics" && (
+                <AnalyticsDashboard />
+              )}
+
+              {activeTab === "complaints" && (
+                <Complaints />
+              )}
+
+              {activeTab === "moneyLog" && (
+                <MoneyDonationLog />
+              )}
+
+            </div>
+
+          </div>
+
+        </main>
+
+      </div>
+
     </div>
   );
 }

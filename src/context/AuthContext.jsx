@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem(STORAGE_KEYS.MONEY_DONATIONS, JSON.stringify(moneyDonations));
   }, [moneyDonations, loading]);
 
-  function register({ name, email, password, role, donorType }) {
+  function register({ name, email, password, role, donorType, restaurantPlace }) {
     const emailExists = users.some(
       (u) => u.email.toLowerCase() === email.toLowerCase()
     );
@@ -74,6 +74,15 @@ export function AuthProvider({ children }) {
       image: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6ba368&color=fff`,
       ...(role === "donor" ? { donorType, totalDonations: 0, totalMealsDonated: 0 } : {}),
       ...(role === "ngo" ? { totalFoodReceived: 0, totalPeopleHelped: 0 } : {}),
+      ...(role === "donor" && restaurantPlace
+        ? {
+            address: restaurantPlace.address,
+            osmId: restaurantPlace.osmId,
+            lat: restaurantPlace.lat,
+            lng: restaurantPlace.lng,
+            placeVerified: true,
+          }
+        : {}),
     };
 
     setUsers((prev) => [...prev, newUser]);

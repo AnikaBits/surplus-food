@@ -1,4 +1,8 @@
-
+// ============================================================
+// MODIFIED FILE — src/App.jsx (এটা আগের version থেকে আরেকটু বদলেছে)
+// ============================================================
+// নতুন যোগ হয়েছে: ProtectedRoute দিয়ে dashboard routes wrap করা
+// ============================================================
 
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
